@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>학생 네트워크 (토글 & 반발력)</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #controls { position: absolute; top: 10px; left: 10px; z-index: 1000; }
+    .node { stroke: #fff; stroke-width: 1.5px; cursor: pointer; }
+    .link { stroke-opacity: 0.6; stroke-width: 3px; }  /* 엣지 굵게 */
+    .friend-link { stroke: #999; }
+    .academic-link { stroke: #5DADEC; }
+    .club-link { stroke: #FFB6C1; }  /* 동아리 네트워크 색상 (연한 분홍) */
+    .legend { font-family: sans-serif; font-size: 14px; }
+    .highlight-node { stroke: #282424; stroke-width: 3px; }
+    .highlight-link { stroke: #f53737; stroke-opacity: 1; stroke-width: 3px; }
+  </style>
+</head>
+<body>
+  <!-- 컨트롤 버튼 -->
+  <div id="controls">
+    <button id="toggle-friend">Toggle Friend Network</button>
+    <button id="toggle-academic">Toggle Academic Network</button>
+    <button id="toggle-club">Toggle Club Network</button>
+    <button id="toggle-simulation">Turn Off Repulsion</button>
+  </div>
+  <!-- D3.js 라이브러리 로드 -->
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script>
+    // 노드 데이터 (학생 1~20, 그룹 및 공격성 정보)
+    const nodes = [
+      {id: 0, name: "학생 1", group: "그룹 A", aggression: 3},
+      {id: 1, name: "학생 2", group: "그룹 A", aggression: 4},
+      {id: 2, name: "학생 3", group: "그룹 A", aggression: 3},
+      {id: 3, name: "학생 4", group: "그룹 A", aggression: 5},
+      {id: 4, name: "학생 5", group: "그룹 B", aggression: 3},
+      {id: 5, name: "학생 6", group: "그룹 B", aggression: 2},
+      {id: 6, name: "학생 7", group: "그룹 B", aggression: 3},
+      {id: 7, name: "학생 8", group: "그룹 B", aggression: 3},
+      {id: 8, name: "학생 9", group: "그룹 B", aggression: 4},
+      {id: 9, name: "학생 10", group: "그룹 B", aggression: 3},
+      {id: 10, name: "학생 11", group: "그룹 C", aggression: 2},
+      {id: 11, name: "학생 12", group: "그룹 C", aggression: 3},
+      {id: 12, name: "학생 13", group: "그룹 C", aggression: 3},
+      {id: 13, name: "학생 14", group: "그룹 C", aggression: 3},
+      {id: 14, name: "학생 15", group: "그룹 C", aggression: 4},
+      {id: 15, name: "학생 16", group: "그룹 C", aggression: 3},
+      {id: 16, name: "학생 17", group: "그룹 C", aggression: 3},
+      {id: 17, name: "학생 18", group: "그룹 C", aggression: 5},
+      {id: 18, name: "학생 19", group: "그룹 C", aggression: 3},
+      {id: 19, name: "학생 20", group: "그룹 C", aggression: 3}
+    ];
+
+    // 친구 네트워크 링크 데이터
+    const friendLinks = [
+      {source: 0, target: 1},
+      {source: 0, target: 2},
+      {source: 1, target: 2},
+      {source: 1, target: 3},
+      {source: 2, target: 3},
+      {source: 2, target: 4},
+      {source: 3, target: 5},
+      {source: 3, target: 6},
+      {source: 3, target: 7},
+      {source: 4, target: 7},
+      {source: 5, target: 8},
+      {source: 6, target: 9},
+      {source: 7, target: 10},
+      {source: 8, target: 11},
+      {source: 9, target: 12}
+    ];
+
+    // 학업 네트워크 링크 데이터
+    const academicLinks = [
+      {source: 0, target: 4},
+      {source: 2, target: 5},
+      {source: 1, target: 6},
+      {source: 3, target: 7},
+      {source: 4, target: 8},
+      {source: 5, target: 9},
+      {source: 6, target: 10},
+      {source: 7, target: 11},
+      {source: 8, target: 12},
+      {source: 9, target: 13},
+      {source: 10, target: 14},
+      {source: 11, target: 15},
+      {source: 12, target: 16},
+      {source: 13, target: 17},
+      {source: 14, target: 18},
+      {source: 15, target: 19}
+    ];
+
+    // 새 네트워크 (예: 동아리 네트워크) 링크 데이터
+    const clubLinks = [
+      {source: 0, target: 5},
+      {source: 1, target: 7},
+      {source: 2, target: 6},
+      {source: 3, target: 8},
+      {source: 4, target: 9},
+      {source: 10, target: 14},
+      {source: 11, target: 15},
+      {source: 12, target: 16},
+      {source: 13, target: 17},
+      {source: 14, target: 18},
+      {source: 15, target: 19}
+    ];
+
+    // 공격성 값에 따른 노드 크기 매핑
+    const sizeScale = d3.scaleLinear()
+      .domain([1, 5])
+      .range([6, 20]);
+
+    // 그룹별 색상 매핑
+    const colorScale = d3.scaleOrdinal()
+      .domain(["그룹 A", "그룹 B", "그룹 C"])
+      .range(["#FF6F61", "#FFD166", "#5DADEC"]);
+
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const svg = d3.select("body").append("svg")
+      .attr("width", width)
+      .attr("height", height);
+
+    // 전체 그래프를 포함할 zoomable 그룹
+    const g = svg.append("g");
+
+    // 줌/팬 설정 (최소 0.5배 ~ 최대 5배)
+    const zoom = d3.zoom()
+      .scaleExtent([0.5, 5])
+      .on("zoom", event => {
+        g.attr("transform", event.transform);
+      });
+    svg.call(zoom);
+
+    // 화살표 마커 정의 (크기 축소)
+    svg.append("defs").append("marker")
+      .attr("id", "arrowhead")
+      .attr("viewBox", "0 -5 10 10")
+      .attr("refX", 20)  // 기존 27에서 축소
+      .attr("refY", 0)
+      .attr("markerWidth", 4)  // 기존 6에서 축소
+      .attr("markerHeight", 4)  // 기존 6에서 축소
+      .attr("orient", "auto")
+      .append("path")
+      .attr("d", "M0,-5L10,0L0,5")
+      .attr("fill", "#999");
+
+    // force simulation 설정
+    const allLinks = friendLinks.concat(academicLinks, clubLinks);
+    // 초기에 repulsion force는 -150으로 설정
+    const simulation = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(allLinks).id(d => d.id).distance(100))
+      .force("charge", d3.forceManyBody().strength(-150))
+      .force("center", d3.forceCenter(width / 2, height / 2));
+
+    // 친구 네트워크 렌더링
+    const friendLink = g.append("g")
+      .attr("class", "friend-links")
+      .selectAll("line")
+      .data(friendLinks)
+      .enter().append("line")
+      .attr("class", "link friend-link")
+      .attr("stroke", "#999")
+      .attr("stroke-opacity", 0.6)
+      .attr("stroke-width", 3)
+      .attr("marker-end", "url(#arrowhead)");
+
+    // 학업 네트워크 렌더링
+    const academicLink = g.append("g")
+      .attr("class", "academic-links")
+      .selectAll("line")
+      .data(academicLinks)
+      .enter().append("line")
+      .attr("class", "link academic-link")
+      .attr("stroke", "#5DADEC")
+      .attr("stroke-opacity", 0.6)
+      .attr("stroke-width", 3)
+      .attr("marker-end", "url(#arrowhead)");
+
+    // 새 네트워크 (동아리 네트워크) 렌더링
+    const clubLink = g.append("g")
+      .attr("class", "club-links")
+      .selectAll("line")
+      .data(clubLinks)
+      .enter().append("line")
+      .attr("class", "link club-link")
+      .attr("stroke", "#FFB6C1")
+      .attr("stroke-opacity", 0.6)
+      .attr("stroke-width", 3)
+      .attr("marker-end", "url(#arrowhead)");
+
+    // 노드 렌더링
+    const node = g.append("g")
+      .attr("class", "nodes")
+      .selectAll("circle")
+      .data(nodes)
+      .enter().append("circle")
+      .attr("class", "node")
+      .attr("r", d => sizeScale(d.aggression))
+      .attr("fill", d => colorScale(d.group))
+      .call(drag(simulation))
+      .on("click", nodeClicked);
+
+    // 노드 라벨
+    const labels = g.append("g")
+      .attr("class", "labels")
+      .selectAll("text")
+      .data(nodes)
+      .enter().append("text")
+      .attr("dy", -15)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "10px")
+      .text(d => d.name);
+
+    // 드래그 함수 정의
+    function drag(simulation) {
+      function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+      }
+      function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+      }
+      function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        // 드래그 후 고정 해제 -> 사용자가 이동시킨대로만 움직임
+        d.fx = null;
+        d.fy = null;
+      }
+      return d3.drag()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended);
+    }
+
+    // 노드 클릭 시 연결된 링크 하이라이트
+    function nodeClicked(event, clickedNode) {
+      node.classed("highlight-node", false);
+      friendLink.classed("highlight-link", false);
+      academicLink.classed("highlight-link", false);
+      clubLink.classed("highlight-link", false);
+      d3.select(this).classed("highlight-node", true);
+      
+      friendLink.filter(d => d.source.id === clickedNode.id || d.target.id === clickedNode.id)
+        .classed("highlight-link", true);
+      academicLink.filter(d => d.source.id === clickedNode.id || d.target.id === clickedNode.id)
+        .classed("highlight-link", true);
+      clubLink.filter(d => d.source.id === clickedNode.id || d.target.id === clickedNode.id)
+        .classed("highlight-link", true);
+      event.stopPropagation();
+    }
+
+    // 배경 클릭 시 하이라이트 초기화
+    svg.on("click", function(event) {
+      if (event.target.tagName !== "circle") {
+        node.classed("highlight-node", false);
+        friendLink.classed("highlight-link", false);
+        academicLink.classed("highlight-link", false);
+        clubLink.classed("highlight-link", false);
+      }
+    });
+
+    // 시뮬레이션 tick 업데이트
+    simulation.on("tick", () => {
+      friendLink.attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+      academicLink.attr("x1", d => d.source.x)
+                  .attr("y1", d => d.source.y)
+                  .attr("x2", d => d.target.x)
+                  .attr("y2", d => d.target.y);
+      clubLink.attr("x1", d => d.source.x)
+              .attr("y1", d => d.source.y)
+              .attr("x2", d => d.target.x)
+              .attr("y2", d => d.target.y);
+      node.attr("cx", d => d.x = Math.max(sizeScale(d.aggression), Math.min(width - sizeScale(d.aggression), d.x)))
+          .attr("cy", d => d.y = Math.max(sizeScale(d.aggression), Math.min(height - sizeScale(d.aggression), d.y)));
+      labels.attr("x", d => d.x)
+            .attr("y", d => d.y);
+    });
+
+    // 범례 (그룹별 색상)
+    const legendData = colorScale.domain();
+    const legend = svg.append("g")
+      .attr("class", "legend")
+      .attr("transform", "translate(20,20)");
+
+    legend.selectAll("rect")
+      .data(legendData)
+      .enter()
+      .append("rect")
+      .attr("x", 0)
+      .attr("y", (d, i) => i * 25)
+      .attr("width", 18)
+      .attr("height", 18)
+      .attr("fill", d => colorScale(d));
+
+    legend.selectAll("text")
+      .data(legendData)
+      .enter()
+      .append("text")
+      .attr("x", 25)
+      .attr("y", (d, i) => i * 25 + 14)
+      .text(d => d);
+
+    // 네트워크 토글 버튼 이벤트
+    document.getElementById("toggle-friend").addEventListener("click", function() {
+      const friendGroup = d3.select(".friend-links");
+      const currentDisplay = friendGroup.style("display");
+      friendGroup.style("display", currentDisplay === "none" ? "block" : "none");
+    });
+    document.getElementById("toggle-academic").addEventListener("click", function() {
+      const academicGroup = d3.select(".academic-links");
+      const currentDisplay = academicGroup.style("display");
+      academicGroup.style("display", currentDisplay === "none" ? "block" : "none");
+    });
+    document.getElementById("toggle-club").addEventListener("click", function() {
+      const clubGroup = d3.select(".club-links");
+      const currentDisplay = clubGroup.style("display");
+      clubGroup.style("display", currentDisplay === "none" ? "block" : "none");
+    });
+
+    // 반발력 토글 버튼 이벤트
+    // repulsionActive가 true면 반발력이 -150, false면 0
+    let repulsionActive = true;
+    document.getElementById("toggle-simulation").addEventListener("click", function() {
+      repulsionActive = !repulsionActive;
+      simulation.force("charge").strength(repulsionActive ? -150 : 0);
+      simulation.alpha(1).restart();
+      this.textContent = repulsionActive ? "Turn Off Repulsion" : "Turn On Repulsion";
+    });
+  </script>
+</body>
+</html>
