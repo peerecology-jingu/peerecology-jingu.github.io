@@ -5,41 +5,7 @@
   <title>학생 네트워크 (학생 19 중심)</title>
   <style>
     body { margin: 0; overflow: hidden; }
-
-    #controls {
-      position: absolute; top: 10px; left: 10px; z-index: 1000;
-    }
-
-    #behavior-buttons {
-      position: absolute; top: 10px; right: 10px; z-index: 1000;
-      display: flex; flex-direction: column; gap: 10px;
-    }
-
-    .behavior-btn {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      border: none;
-      font-size: 11px;
-      font-weight: bold;
-      color: #222;
-      cursor: pointer;
-      padding: 5px;
-      line-height: 1.2;
-      text-align: center;
-      transition: transform 0.2s, box-shadow 0.2s;
-      box-shadow: none;
-    }
-
-    .behavior-btn:hover {
-      transform: scale(1.1);
-    }
-
-    .behavior-btn.active {
-      box-shadow: 0 0 0 3px #000 inset;
-      transform: scale(1.1);
-    }
-
+    #controls { position: absolute; top: 10px; left: 10px; z-index: 1000; }
     .node { stroke: #fff; stroke-width: 1.5px; cursor: pointer; }
     .core-node { stroke: #000; stroke-width: 4px; }
     .link { stroke-opacity: 0.6; stroke-width: 3px; }
@@ -50,31 +16,19 @@
   </style>
 </head>
 <body>
-
   <div id="controls">
     <button id="toggle-friend">친구관계 보기</button>
     <button id="toggle-desired">친하고 싶은 친구 보기</button>
     <button id="toggle-collaboration">함께 돕는 친구 보기</button>
     <button id="toggle-learning">함께 공부하는 친구 보기</button>
   </div>
-
-  <div id="behavior-buttons">
-    <button class="behavior-btn" data-attr="aggression" style="background-color:#f87171;">공<br>격<br>성</button>
-    <button class="behavior-btn" data-attr="prosociality" style="background-color:#4ade80;">친<br>사<br>회</button>
-    <button class="behavior-btn" data-attr="community" style="background-color:#60a5fa;">공<br>동<br>체</button>
-    <button class="behavior-btn" data-attr="popularity" style="background-color:#facc15;">인<br>기</button>
-  </div>
-
   <script src="https://d3js.org/d3.v6.min.js"></script>
   <script>
     const nodes = Array.from({ length: 20 }, (_, i) => ({
       id: i,
       name: `학생 ${i + 1}`,
       group: i < 10 ? "그룹 A" : "그룹 B",
-      aggression: Math.floor(Math.random() * 5) + 1,
-      prosociality: Math.floor(Math.random() * 5) + 1,
-      community: Math.floor(Math.random() * 5) + 1,
-      popularity: Math.floor(Math.random() * 5) + 1
+      aggression: 3
     }));
 
     const friendLinks = [
@@ -117,7 +71,7 @@
       connectedIds.add(t);
     });
 
-    const sizeScale = d3.scaleLinear().domain([1, 5]).range([9, 30]);
+    const sizeScale = d3.scaleLinear().domain([1, 5]).range([6, 20]);
     const colorScale = d3.scaleOrdinal().domain(["그룹 A", "그룹 B"]).range(["#FF6F61", "#FFD166"]);
     const width = window.innerWidth, height = window.innerHeight;
 
@@ -134,10 +88,11 @@
     const zoom = d3.zoom().scaleExtent([0.5, 5]).on("zoom", event => g.attr("transform", event.transform));
     svg.call(zoom);
 
+    // 초기 줌 인
     const initialZoom = () => {
       const transform = d3.zoomIdentity
         .translate(width / 2, height / 2)
-        .scale(2)
+        .scale(2) // 확대 비율
         .translate(-centerX, -centerY);
       svg.call(zoom.transform, transform);
     };
@@ -165,26 +120,38 @@
 
     const simulation = d3.forceSimulation(nodes)
       .force("link", d3.forceLink(allLinks).id(d => d.id).distance(100))
-      .force("charge", d3.forceManyBody().strength(-180))
+      .force("charge", d3.forceManyBody().strength(-150))
       .force("center", d3.forceCenter(centerX, centerY));
 
-    const friendLink = drawLinks(friendLinksFiltered, "friend-links", "friend-link", "url(#arrow-friend)");
-    const desiredLink = drawLinks(desiredLinksFiltered, "desired-links", "desired-link", "url(#arrow-desired)");
-    const collaborationLink = drawLinks(collaborationLinksFiltered, "collaboration-links", "collaboration-link", "url(#arrow-collaboration)");
-    const learningLink = drawLinks(learningLinksFiltered, "learning-links", "learning-link", "url(#arrow-learning)");
+    const friendLink = g.append("g").attr("class", "friend-links")
+      .selectAll("line").data(friendLinksFiltered).enter().append("line")
+      .attr("class", "link friend-link")
+      .attr("marker-end", "url(#arrow-friend)")
+      .style("visibility", "hidden");
 
-    function drawLinks(data, groupClass, linkClass, marker) {
-      return g.append("g").attr("class", groupClass)
-        .selectAll("line").data(data).enter().append("line")
-        .attr("class", `link ${linkClass}`).attr("marker-end", marker)
-        .style("visibility", "hidden");
-    }
+    const desiredLink = g.append("g").attr("class", "desired-links")
+      .selectAll("line").data(desiredLinksFiltered).enter().append("line")
+      .attr("class", "link desired-link")
+      .attr("marker-end", "url(#arrow-desired)")
+      .style("visibility", "hidden");
+
+    const collaborationLink = g.append("g").attr("class", "collaboration-links")
+      .selectAll("line").data(collaborationLinksFiltered).enter().append("line")
+      .attr("class", "link collaboration-link")
+      .attr("marker-end", "url(#arrow-collaboration)")
+      .style("visibility", "hidden");
+
+    const learningLink = g.append("g").attr("class", "learning-links")
+      .selectAll("line").data(learningLinksFiltered).enter().append("line")
+      .attr("class", "link learning-link")
+      .attr("marker-end", "url(#arrow-learning)")
+      .style("visibility", "hidden");
 
     const node = g.append("g").attr("class", "nodes")
       .selectAll("circle").data(nodes).enter().append("circle")
       .filter(d => connectedIds.has(d.id))
       .attr("class", d => "node" + (d.id === targetId ? " core-node" : ""))
-      .attr("r", 10) // 기본 크기
+      .attr("r", d => sizeScale(d.aggression))
       .attr("fill", d => colorScale(d.group))
       .call(d3.drag()
         .on("start", (event, d) => { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
@@ -227,33 +194,6 @@
       d3.selectAll(selector + " line")
         .style("visibility", toggleStates[selector] ? "visible" : "hidden");
     }
-
-    // ✅ 버튼 클릭 시 속성 토글 + 강조
-    let currentAttribute = null;
-
-    const behaviorButtons = document.querySelectorAll(".behavior-btn");
-    behaviorButtons.forEach(btn => {
-      btn.addEventListener("click", () => {
-        const attr = btn.dataset.attr;
-
-        if (currentAttribute === attr) {
-          // 다시 클릭 → 원상복귀
-          currentAttribute = null;
-          g.selectAll(".nodes circle")
-            .transition().duration(500)
-            .attr("r", 10);
-          behaviorButtons.forEach(b => b.classList.remove("active"));
-        } else {
-          // 새로운 속성 선택
-          currentAttribute = attr;
-          g.selectAll(".nodes circle")
-            .transition().duration(500)
-            .attr("r", d => sizeScale(d[attr]));
-          behaviorButtons.forEach(b => b.classList.remove("active"));
-          btn.classList.add("active");
-        }
-      });
-    });
   </script>
 </body>
 </html>
