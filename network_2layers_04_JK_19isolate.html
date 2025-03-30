@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>학생 네트워크 (학생 19 중심)</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #controls { position: absolute; top: 10px; left: 10px; z-index: 1000; }
+    .node { stroke: #fff; stroke-width: 1.5px; cursor: pointer; }
+    .core-node { stroke: #000; stroke-width: 4px; }
+    .link { stroke-opacity: 0.6; stroke-width: 3px; }
+    .friend-link { stroke: #999; }
+    .desired-link { stroke: #5DADEC; }
+    .collaboration-link { stroke: #f34b27; }
+    .learning-link { stroke: #32CD32; }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <button id="toggle-friend">친구관계 보기</button>
+    <button id="toggle-desired">친하고 싶은 친구 보기</button>
+    <button id="toggle-collaboration">함께 돕는 친구 보기</button>
+    <button id="toggle-learning">함께 공부하는 친구 보기</button>
+  </div>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script>
+    const nodes = Array.from({ length: 20 }, (_, i) => ({
+      id: i,
+      name: `학생 ${i + 1}`,
+      group: i < 10 ? "그룹 A" : "그룹 B",
+      aggression: 3
+    }));
+
+    const friendLinks = [
+      { source: 0, target: 1 }, { source: 0, target: 2 }, { source: 1, target: 3 },
+      { source: 2, target: 3 }, { source: 3, target: 5 }, { source: 5, target: 6 },
+      { source: 6, target: 7 }, { source: 7, target: 8 }, { source: 9, target: 10 },
+      { source: 10, target: 11 }, { source: 11, target: 12 }, { source: 12, target: 13 },
+      { source: 13, target: 14 }, { source: 14, target: 15 }, { source: 15, target: 16 },
+      { source: 17, target: 19 }
+    ];
+
+    const desiredLinks = [
+      { source: 7, target: 18 }, { source: 8, target: 18 }, { source: 10, target: 18 },
+      { source: 11, target: 18 }, { source: 13, target: 18 }
+    ];
+
+    const collaborationLinks = [
+      { source: 8, target: 18 }, { source: 9, target: 18 }, { source: 10, target: 18 },
+      { source: 12, target: 18 }, { source: 13, target: 18 }
+    ];
+
+    const learningLinks = [
+      { source: 10, target: 18 }, { source: 11, target: 18 }, { source: 14, target: 18 },
+      { source: 15, target: 18 }, { source: 19, target: 18 }
+    ];
+
+    const targetId = 18;
+    const friendLinksFiltered = friendLinks.filter(d => d.source === targetId || d.target === targetId);
+    const desiredLinksFiltered = desiredLinks.filter(d => d.source === targetId || d.target === targetId);
+    const collaborationLinksFiltered = collaborationLinks.filter(d => d.source === targetId || d.target === targetId);
+    const learningLinksFiltered = learningLinks.filter(d => d.source === targetId || d.target === targetId);
+
+    const allLinks = [...friendLinksFiltered, ...desiredLinksFiltered, ...collaborationLinksFiltered, ...learningLinksFiltered];
+
+    const connectedIds = new Set([targetId]);
+    allLinks.forEach(l => {
+      const s = typeof l.source === "object" ? l.source.id : l.source;
+      const t = typeof l.target === "object" ? l.target.id : l.target;
+      connectedIds.add(s);
+      connectedIds.add(t);
+    });
+
+    const sizeScale = d3.scaleLinear().domain([1, 5]).range([6, 20]);
+    const colorScale = d3.scaleOrdinal().domain(["그룹 A", "그룹 B"]).range(["#FF6F61", "#FFD166"]);
+    const width = window.innerWidth, height = window.innerHeight;
+
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const targetNode = nodes.find(n => n.id === targetId);
+    targetNode.x = centerX;
+    targetNode.y = centerY;
+    targetNode.fx = centerX;
+    targetNode.fy = centerY;
+
+    const svg = d3.select("body").append("svg").attr("width", width).attr("height", height);
+    const g = svg.append("g");
+    const zoom = d3.zoom().scaleExtent([0.5, 5]).on("zoom", event => g.attr("transform", event.transform));
+    svg.call(zoom);
+
+    // 초기 줌 인
+    const initialZoom = () => {
+      const transform = d3.zoomIdentity
+        .translate(width / 2, height / 2)
+        .scale(2) // 확대 비율
+        .translate(-centerX, -centerY);
+      svg.call(zoom.transform, transform);
+    };
+    initialZoom();
+
+    const defs = svg.append("defs");
+    [
+      { id: "arrow-friend", color: "#999" },
+      { id: "arrow-desired", color: "#5DADEC" },
+      { id: "arrow-collaboration", color: "#f34b27" },
+      { id: "arrow-learning", color: "#32CD32" }
+    ].forEach(({ id, color }) => {
+      defs.append("marker")
+        .attr("id", id)
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 15)
+        .attr("refY", 0)
+        .attr("markerWidth", 6)
+        .attr("markerHeight", 6)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("d", "M0,-5L10,0L0,5")
+        .attr("fill", color);
+    });
+
+    const simulation = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(allLinks).id(d => d.id).distance(100))
+      .force("charge", d3.forceManyBody().strength(-150))
+      .force("center", d3.forceCenter(centerX, centerY));
+
+    const friendLink = g.append("g").attr("class", "friend-links")
+      .selectAll("line").data(friendLinksFiltered).enter().append("line")
+      .attr("class", "link friend-link")
+      .attr("marker-end", "url(#arrow-friend)")
+      .style("visibility", "hidden");
+
+    const desiredLink = g.append("g").attr("class", "desired-links")
+      .selectAll("line").data(desiredLinksFiltered).enter().append("line")
+      .attr("class", "link desired-link")
+      .attr("marker-end", "url(#arrow-desired)")
+      .style("visibility", "hidden");
+
+    const collaborationLink = g.append("g").attr("class", "collaboration-links")
+      .selectAll("line").data(collaborationLinksFiltered).enter().append("line")
+      .attr("class", "link collaboration-link")
+      .attr("marker-end", "url(#arrow-collaboration)")
+      .style("visibility", "hidden");
+
+    const learningLink = g.append("g").attr("class", "learning-links")
+      .selectAll("line").data(learningLinksFiltered).enter().append("line")
+      .attr("class", "link learning-link")
+      .attr("marker-end", "url(#arrow-learning)")
+      .style("visibility", "hidden");
+
+    const node = g.append("g").attr("class", "nodes")
+      .selectAll("circle").data(nodes).enter().append("circle")
+      .filter(d => connectedIds.has(d.id))
+      .attr("class", d => "node" + (d.id === targetId ? " core-node" : ""))
+      .attr("r", d => sizeScale(d.aggression))
+      .attr("fill", d => colorScale(d.group))
+      .call(d3.drag()
+        .on("start", (event, d) => { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+        .on("drag", (event, d) => { d.fx = event.x; d.fy = event.y; })
+        .on("end", (event, d) => { if (!event.active) simulation.alphaTarget(0); if (d.id !== targetId) { d.fx = null; d.fy = null; } })
+      );
+
+    const labels = g.append("g").attr("class", "labels")
+      .selectAll("text").data(nodes).enter().append("text")
+      .filter(d => connectedIds.has(d.id))
+      .attr("dy", -15).attr("text-anchor", "middle")
+      .attr("font-size", "10px")
+      .text(d => d.name);
+
+    simulation.on("tick", () => {
+      [friendLink, desiredLink, collaborationLink, learningLink].forEach(linkGroup => {
+        linkGroup.attr("x1", d => d.source.x)
+                 .attr("y1", d => d.source.y)
+                 .attr("x2", d => d.target.x)
+                 .attr("y2", d => d.target.y);
+      });
+      g.selectAll(".nodes circle").attr("cx", d => d.x).attr("cy", d => d.y);
+      g.selectAll(".labels text").attr("x", d => d.x).attr("y", d => d.y);
+    });
+
+    const toggleStates = {
+      ".friend-links": false,
+      ".desired-links": false,
+      ".collaboration-links": false,
+      ".learning-links": false
+    };
+
+    document.getElementById("toggle-friend").addEventListener("click", () => toggleNetwork(".friend-links"));
+    document.getElementById("toggle-desired").addEventListener("click", () => toggleNetwork(".desired-links"));
+    document.getElementById("toggle-collaboration").addEventListener("click", () => toggleNetwork(".collaboration-links"));
+    document.getElementById("toggle-learning").addEventListener("click", () => toggleNetwork(".learning-links"));
+
+    function toggleNetwork(selector) {
+      toggleStates[selector] = !toggleStates[selector];
+      d3.selectAll(selector + " line")
+        .style("visibility", toggleStates[selector] ? "visible" : "hidden");
+    }
+  </script>
+</body>
+</html>
