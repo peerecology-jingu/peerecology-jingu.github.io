@@ -22,6 +22,9 @@
     .desired-link { stroke: #5DADEC; }
     .collaboration-link { stroke: #f34b27; }
     .learning-link { stroke: #32CD32; }
+    .mutual-like-link { stroke: hotpink; }
+    .dislike-link { stroke: red; }
+
     .highlight-node { stroke: #282424; stroke-width: 3px; }
     .highlight-link { stroke: #f53737; stroke-opacity: 1; stroke-width: 3px; }
 
@@ -48,10 +51,13 @@
       box-shadow: 0 0 0 3px #000 inset;
     }
 
-    #btn-aggression { background-color: #f87171; }
-    #btn-prosociality { background-color: #4ade80; }
-    #btn-community { background-color: #60a5fa; }
-    #btn-popularity { background-color: #facc15; }
+    /* 버튼 색상 통일 (회색) */
+    #btn-aggression,
+    #btn-prosociality,
+    #btn-community,
+    #btn-popularity {
+      background-color: #cccccc;
+    }
   </style>
 </head>
 <body>
@@ -61,6 +67,8 @@
     <button id="toggle-desired">친하고 싶은 친구 보기</button>
     <button id="toggle-collaboration">함께 돕는 친구 보기</button>
     <button id="toggle-learning">함께 공부하는 친구 보기</button>
+    <button id="toggle-mutual-like">서로 좋아하는 친구 보기</button>
+    <button id="toggle-dislike">서로 싫어하는 친구 보기</button>
   </div>
 
   <div id="controls-right">
@@ -82,7 +90,7 @@
       popularity: Math.floor(Math.random() * 5) + 1
     }));
 
-    const friendLinks = [ /* 생략 가능: 기존 링크 동일 */ 
+    const friendLinks = [
       {source: 0, target: 1}, {source: 0, target: 2}, {source: 1, target: 3},
       {source: 2, target: 3}, {source: 3, target: 5}, {source: 5, target: 6},
       {source: 6, target: 7}, {source: 7, target: 8}, {source: 9, target: 10},
@@ -91,22 +99,37 @@
       {source: 17, target: 19}
     ];
 
-    const desiredLinks = [ {source: 0, target: 4}, {source: 1, target: 4}, {source: 2, target: 4},
+    const desiredLinks = [
+      {source: 0, target: 4}, {source: 1, target: 4}, {source: 2, target: 4},
       {source: 3, target: 4}, {source: 5, target: 4}, {source: 6, target: 4},
       {source: 7, target: 18}, {source: 8, target: 18}, {source: 10, target: 18},
       {source: 11, target: 18}, {source: 13, target: 18}, {source: 17, target: 4}, {source: 19, target: 4}
     ];
 
-    const collaborationLinks = [ {source: 0, target: 4}, {source: 2, target: 4}, {source: 3, target: 4},
+    const collaborationLinks = [
+      {source: 0, target: 4}, {source: 2, target: 4}, {source: 3, target: 4},
       {source: 5, target: 4}, {source: 6, target: 4}, {source: 7, target: 4},
       {source: 8, target: 18}, {source: 9, target: 18}, {source: 10, target: 18},
       {source: 12, target: 18}, {source: 13, target: 18}, {source: 17, target: 19}, {source: 19, target: 17}
     ];
 
-    const learningLinks = [ {source: 1, target: 4}, {source: 2, target: 4}, {source: 3, target: 4},
+    const learningLinks = [
+      {source: 1, target: 4}, {source: 2, target: 4}, {source: 3, target: 4},
       {source: 5, target: 4}, {source: 7, target: 4}, {source: 9, target: 4},
       {source: 10, target: 18}, {source: 11, target: 18}, {source: 14, target: 18},
       {source: 15, target: 18}, {source: 17, target: 4}, {source: 19, target: 18}
+    ];
+
+    const mutualLikeLinks = [
+      {source: 0, target: 3}, {source: 2, target: 1},{source: 4, target: 7},
+      {source: 5, target: 4}, {source: 6, target: 4}, {source: 7, target: 4},
+      {source: 8, target: 18}, {source: 9, target: 18}, {source: 10, target: 18}      
+    ];
+
+    const dislikeLinks = [
+      {source: 1, target: 6},{source: 2, target: 9},{source: 5, target: 13},
+      {source: 7, target: 18}, {source: 8, target: 18}, {source: 10, target: 18},
+      {source: 11, target: 18}, {source: 13, target: 18}      
     ];
 
     const sizeScale = d3.scaleLinear().domain([1, 5]).range([9, 30]);
@@ -122,7 +145,9 @@
       {id: "arrow-friend", color: "#999"},
       {id: "arrow-desired", color: "#5DADEC"},
       {id: "arrow-collaboration", color: "#f34b27"},
-      {id: "arrow-learning", color: "#32CD32"}
+      {id: "arrow-learning", color: "#32CD32"},
+      {id: "arrow-mutual-like", color: "hotpink"},
+      {id: "arrow-dislike", color: "red"}
     ];
 
     markers.forEach(({id, color}) => {
@@ -132,19 +157,20 @@
         .append("path").attr("d", "M0,-5L10,0L0,5").attr("fill", color);
     });
 
+    const allLinks = friendLinks.concat(
+      desiredLinks, collaborationLinks, learningLinks, mutualLikeLinks, dislikeLinks
+    );
+
     const simulation = d3.forceSimulation(nodes)
-      .force("link", d3.forceLink().id(d => d.id).distance(100))
+      .force("link", d3.forceLink().id(d => d.id).distance(100).links(allLinks))
       .force("charge", d3.forceManyBody().strength(-180))
       .force("center", d3.forceCenter(width / 2, height / 2))
       .force("collision", d3.forceCollide().radius(20));
 
-    const allLinks = friendLinks.concat(desiredLinks, collaborationLinks, learningLinks);
-    simulation.force("link").links(allLinks);
-
     const node = g.append("g").attr("class", "nodes")
       .selectAll("circle").data(nodes).enter().append("circle")
       .attr("class", "node")
-      .attr("r", 10) // 초기 고정 크기
+      .attr("r", 10)
       .attr("fill", d => colorScale(d.group))
       .call(drag(simulation)).on("click", nodeClicked);
 
@@ -157,6 +183,8 @@
     const desiredLink = drawLinks(desiredLinks, "desired-links", "desired-link", "url(#arrow-desired)");
     const collaborationLink = drawLinks(collaborationLinks, "collaboration-links", "collaboration-link", "url(#arrow-collaboration)");
     const learningLink = drawLinks(learningLinks, "learning-links", "learning-link", "url(#arrow-learning)");
+    const mutualLikeLink = drawLinks(mutualLikeLinks, "mutual-like-links", "mutual-like-link", "url(#arrow-mutual-like)");
+    const dislikeLink = drawLinks(dislikeLinks, "dislike-links", "dislike-link", "url(#arrow-dislike)");
 
     function drawLinks(data, groupClass, linkClass, marker) {
       return g.append("g").attr("class", groupClass).style("display", "none")
@@ -181,11 +209,11 @@
 
     function nodeClicked(event, clickedNode) {
       node.classed("highlight-node", false);
-      [friendLink, desiredLink, collaborationLink, learningLink].forEach(link =>
+      [friendLink, desiredLink, collaborationLink, learningLink, mutualLikeLink, dislikeLink].forEach(link =>
         link.classed("highlight-link", false)
       );
       d3.select(this).classed("highlight-node", true);
-      [friendLink, desiredLink, collaborationLink, learningLink].forEach(link =>
+      [friendLink, desiredLink, collaborationLink, learningLink, mutualLikeLink, dislikeLink].forEach(link =>
         link.filter(d => d.source.id === clickedNode.id || d.target.id === clickedNode.id)
             .classed("highlight-link", true)
       );
@@ -195,14 +223,14 @@
     svg.on("click", function(event) {
       if (event.target.tagName !== "circle") {
         node.classed("highlight-node", false);
-        [friendLink, desiredLink, collaborationLink, learningLink].forEach(link =>
+        [friendLink, desiredLink, collaborationLink, learningLink, mutualLikeLink, dislikeLink].forEach(link =>
           link.classed("highlight-link", false)
         );
       }
     });
 
     simulation.on("tick", () => {
-      [friendLink, desiredLink, collaborationLink, learningLink].forEach(linkGroup => {
+      [friendLink, desiredLink, collaborationLink, learningLink, mutualLikeLink, dislikeLink].forEach(linkGroup => {
         linkGroup.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
                  .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
       });
@@ -220,13 +248,13 @@
     document.getElementById("toggle-desired").addEventListener("click", () => toggleNetwork(".desired-links"));
     document.getElementById("toggle-collaboration").addEventListener("click", () => toggleNetwork(".collaboration-links"));
     document.getElementById("toggle-learning").addEventListener("click", () => toggleNetwork(".learning-links"));
+    document.getElementById("toggle-mutual-like").addEventListener("click", () => toggleNetwork(".mutual-like-links"));
+    document.getElementById("toggle-dislike").addEventListener("click", () => toggleNetwork(".dislike-links"));
 
-    // ✅ 노드 크기 속성 토글 로직
     let currentAttr = null;
     document.querySelectorAll("#controls-right button").forEach(btn => {
       btn.addEventListener("click", () => {
         const attr = btn.dataset.attr;
-
         if (currentAttr === attr) {
           currentAttr = null;
           node.transition().duration(500).attr("r", 10);
@@ -237,7 +265,6 @@
           document.querySelectorAll("#controls-right button").forEach(b => b.classList.remove("active"));
           btn.classList.add("active");
         }
-
         simulation.alpha(1).restart();
       });
     });
