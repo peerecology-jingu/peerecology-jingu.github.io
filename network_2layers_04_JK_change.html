@@ -102,12 +102,12 @@
       return links;
     }
 
-    const friendLinks = generateLinks(10);         // 1차: 적게
-    const desiredLinks = generateLinks(15);        // 2차
-    const collaborationLinks = generateLinks(20);  // 3차
-    const learningLinks = generateLinks(25);       // 4차
-    const mutualLikeLinks = generateLinks(30);     // 5차
-    const dislikeLinks = generateLinks(35);        // 6차: 많게
+    const friendLinks = generateLinks(10);
+    const desiredLinks = generateLinks(15);
+    const collaborationLinks = generateLinks(20);
+    const learningLinks = generateLinks(25);
+    const mutualLikeLinks = generateLinks(30);
+    const dislikeLinks = generateLinks(35);
 
     const sizeScale = d3.scaleLinear().domain([1, 5]).range([9, 30]);
     const colorScale = d3.scaleOrdinal().domain(["그룹 A", "그룹 B"]).range(["#FF6F61", "#FFD166"]);
@@ -115,8 +115,17 @@
 
     const svg = d3.select("body").append("svg").attr("width", width).attr("height", height);
     const g = svg.append("g");
-    const zoom = d3.zoom().scaleExtent([0.5, 5]).on("zoom", event => g.attr("transform", event.transform));
+
+    const zoom = d3.zoom()
+      .scaleExtent([0.5, 5])
+      .on("zoom", event => g.attr("transform", event.transform));
     svg.call(zoom);
+
+    // ✅ 초기 확대 적용
+    const initialScale = 1.8;
+    const initialX = width / 2;
+    const initialY = height / 2;
+    svg.call(zoom.transform, d3.zoomIdentity.translate(initialX, initialY).scale(initialScale).translate(-initialX, -initialY));
 
     const markers = [
       { id: "arrow-friend", color: "#999" },
