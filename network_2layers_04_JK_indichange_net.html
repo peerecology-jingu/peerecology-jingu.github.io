@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>8명 학생 네트워크</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+
+    #controls-left {
+      position: absolute; top: 10px; left: 10px; z-index: 1000;
+      display: flex; flex-direction: column; gap: 5px;
+    }
+
+    #controls-right {
+      position: absolute; top: 10px; right: 10px; z-index: 1000;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    .node { stroke: #fff; stroke-width: 1.5px; cursor: pointer; }
+    .node.focused { stroke: #000; stroke-width: 4px; }
+    .link { stroke-opacity: 0.6; stroke-width: 3px; }
+    .friend-link { stroke: #999; }
+    .desired-link { stroke: #5DADEC; }
+    .collaboration-link { stroke: #f34b27; }
+    .learning-link { stroke: #32CD32; }
+    .mutual-like-link { stroke: hotpink; }
+    .dislike-link { stroke: red; }
+
+    .highlight-node { stroke: #282424; stroke-width: 3px; }
+    .highlight-link { stroke: #f53737; stroke-opacity: 1; stroke-width: 3px; }
+
+    #controls-right button {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: none;
+      font-size: 11px;
+      font-weight: bold;
+      color: #222;
+      cursor: pointer;
+      padding: 5px;
+      line-height: 1.2;
+      text-align: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    #controls-right button:hover {
+      transform: scale(1.1);
+    }
+
+    #controls-right button.active {
+      box-shadow: 0 0 0 3px #000 inset;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="controls-left">
+    <button id="toggle-friend">친구관계 1차</button>
+    <button id="toggle-desired">친구관계 2차</button>
+    <button id="toggle-collaboration">친구관계 3차</button>
+    <button id="toggle-learning">친구관계 4차</button>
+    <button id="toggle-mutual-like">친구관계 5차</button>
+    <button id="toggle-dislike">친구관계 6차</button>
+  </div>
+
+  <div id="controls-right">
+    <!-- 노드 가중치 버튼 제거됨 -->
+  </div>
+
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script>
+    const nodes = Array.from({ length: 8 }, (_, i) => ({
+      id: i,
+      name: `학생 ${i + 1}`,
+      group: i < 4 ? "그룹 A" : "그룹 B",
+      aggression: Math.floor(Math.random() * 5) + 1,
+      prosociality: Math.floor(Math.random() * 5) + 1,
+      community: Math.floor(Math.random() * 5) + 1,
+      popularity: Math.floor(Math.random() * 5) + 1
+    }));
+
+    function generateLinks(numLinks) {
+      const links = [];
+      while (links.length < numLinks) {
+        const source = Math.floor(Math.random() * nodes.length);
+        let target = Math.floor(Math.random() * nodes.length);
+        while (target === source || links.some(l => (l.source === source && l.target === target) || (l.source === target && l.target === source))) {
+          target = Math.floor(Math.random() * nodes.length);
+        }
+        links.push({ source, target });
+      }
+      return links;
+    }
+
+    const friendLinks = generateLinks(5);
+    const desiredLinks = generateLinks(5);
+    const collaborationLinks = generateLinks(6);
+    const learningLinks = generateLinks(6);
+    const mutualLikeLinks = generateLinks(7);
+    const dislikeLinks = generateLinks(7);
+
+    const sizeScale = d3.scaleLinear().domain([1, 5]).range([9, 30]);
+    const colorScale = d3.scaleOrdinal().domain(["그룹 A", "그룹 B"]).range(["#FF6F61", "#FFD166"]);
+    const width = window.innerWidth, height = window.innerHeight;
+
+    const svg = d3.select("body").append("svg").attr("width", width).attr("height", height);
+    const g = svg.append("g");
+
+    const zoom = d3.zoom()
+      .scaleExtent([0.5, 5])
+      .on("zoom", event => g.attr("transform", event.transform));
+    svg.call(zoom);
+
+    const markers = [
+      { id: "arrow-friend", color: "#999" },
+      { id: "arrow-desired", color: "#5DADEC" },
+      { id: "arrow-collaboration", color: "#f34b27" },
+      { id: "arrow-learning", color: "#32CD32" },
+      { id: "arrow-mutual-like", color: "hotpink" },
+      { id: "arrow-dislike", color: "red" }
+    ];
+
+    markers.forEach(({ id, color }) => {
+      svg.append("defs").append("marker")
+        .attr("id", id).attr("viewBox", "0 -5 10 10").attr("refX", 20).attr("refY", 0)
+        .attr("markerWidth", 4).attr("markerHeight", 4).attr("orient", "auto")
+        .append("path").attr("d", "M0,-5L10,0L0,5").attr("fill", color);
+    });
+
+    const allLinks = [...friendLinks, ...desiredLinks, ...collaborationLinks, ...learningLinks, ...mutualLikeLinks, ...dislikeLinks];
+
+    const simulation = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink().id(d => d.id).distance(100).links(allLinks))
+      .force("charge", d3.forceManyBody().strength(-180))
+      .force("center", d3.forceCenter(width / 2, height / 2))
+      .force("collision", d3.forceCollide().radius(20));
+
+    const node = g.append("g").attr("class", "nodes")
+      .selectAll("circle").data(nodes).enter().append("circle")
+      .attr("class", d => d.id === 1 ? "node focused" : "node")
+      .attr("r", 10)
+      .attr("fill", d => colorScale(d.group))
+      .call(d3.drag()
+        .on("start", (event, d) => {
+          if (!event.active) simulation.alphaTarget(0.3).restart();
+          d.fx = d.x; d.fy = d.y;
+        })
+        .on("drag", (event, d) => {
+          d.fx = event.x; d.fy = event.y;
+        })
+        .on("end", (event, d) => {
+          if (!event.active) simulation.alphaTarget(0);
+          d.fx = null; d.fy = null;
+        })
+      ).on("click", nodeClicked);
+
+    const labels = g.append("g").attr("class", "labels")
+      .selectAll("text").data(nodes).enter().append("text")
+      .attr("dy", -15).attr("text-anchor", "middle")
+      .attr("font-size", "10px").text(d => d.name);
+
+    const friendLink = drawLinks(friendLinks, "friend-links", "friend-link", "url(#arrow-friend)");
+    const desiredLink = drawLinks(desiredLinks, "desired-links", "desired-link", "url(#arrow-desired)");
+    const collaborationLink = drawLinks(collaborationLinks, "collaboration-links", "collaboration-link", "url(#arrow-collaboration)");
+    const learningLink = drawLinks(learningLinks, "learning-links", "learning-link", "url(#arrow-learning)");
+    const mutualLikeLink = drawLinks(mutualLikeLinks, "mutual-like-links", "mutual-like-link", "url(#arrow-mutual-like)");
+    const dislikeLink = drawLinks(dislikeLinks, "dislike-links", "dislike-link", "url(#arrow-dislike)");
+
+    function drawLinks(data, groupClass, linkClass, marker) {
+      return g.append("g").attr("class", groupClass).style("display", "none")
+        .selectAll("line").data(data).enter().append("line")
+        .attr("class", `link ${linkClass}`).attr("marker-end", marker);
+    }
+
+    function nodeClicked(event, clickedNode) {
+      node.classed("highlight-node", false);
+      [friendLink, desiredLink, collaborationLink, learningLink, mutualLikeLink, dislikeLink].forEach(link =>
+        link.classed("highlight-link", false)
+      );
+      d3.select(this).classed("highlight-node", true);
+      [friendLink, desiredLink, collaborationLink, learningLink, mutualLikeLink, dislikeLink].forEach(link =>
+        link.filter(d => d.source.id === clickedNode.id || d.target.id === clickedNode.id)
+            .classed("highlight-link", true)
+      );
+      event.stopPropagation();
+    }
+
+    svg.on("click", function (event) {
+      if (event.target.tagName !== "circle") {
+        node.classed("highlight-node", false);
+        [friendLink, desiredLink, collaborationLink, learningLink, mutualLikeLink, dislikeLink].forEach(link =>
+          link.classed("highlight-link", false)
+        );
+      }
+    });
+
+    simulation.on("tick", () => {
+      [friendLink, desiredLink, collaborationLink, learningLink, mutualLikeLink, dislikeLink].forEach(linkGroup => {
+        linkGroup.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+          .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+      });
+      node.attr("cx", d => d.x).attr("cy", d => d.y);
+      labels.attr("x", d => d.x).attr("y", d => d.y);
+    });
+
+    simulation.on("end", () => {
+      const focus = nodes.find(d => d.id === 1); // 학생 2
+      if (focus) {
+        const scale = 2.5;
+        const translate = [width / 2 - scale * focus.x, height / 2 - scale * focus.y];
+        svg.transition().duration(1000).call(
+          zoom.transform,
+          d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
+        );
+      }
+    });
+
+    function toggleNetwork(selector) {
+      const group = d3.select(selector);
+      const currentDisplay = group.style("display");
+      group.style("display", currentDisplay === "none" ? "block" : "none");
+    }
+
+    document.getElementById("toggle-friend").addEventListener("click", () => toggleNetwork(".friend-links"));
+    document.getElementById("toggle-desired").addEventListener("click", () => toggleNetwork(".desired-links"));
+    document.getElementById("toggle-collaboration").addEventListener("click", () => toggleNetwork(".collaboration-links"));
+    document.getElementById("toggle-learning").addEventListener("click", () => toggleNetwork(".learning-links"));
+    document.getElementById("toggle-mutual-like").addEventListener("click", () => toggleNetwork(".mutual-like-links"));
+    document.getElementById("toggle-dislike").addEventListener("click", () => toggleNetwork(".dislike-links"));
+  </script>
+</body>
+</html>
