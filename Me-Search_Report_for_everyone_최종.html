@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Me-Search Report for everyone</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    .scrollbar-thin { scrollbar-width: thin; }
+    .scrollbar-thin::-webkit-scrollbar { height: 6px; width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .is-active { background-color: rgb(37 99 235); color: white; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <header class="w-full border-b bg-white sticky top-0 z-10">
+    <div class="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
+      <h1 class="text-2xl font-bold">[Me-Search Report for everyone]</h1>
+    </div>
+  </header>
+
+  <main class="max-w-[1600px] mx-auto px-6 py-6 grid grid-cols-12 gap-6">
+    <aside class="col-span-12 lg:col-span-3">
+      <div class="bg-white rounded-2xl shadow p-4 space-y-5">
+        <div>
+          <h2 class="text-base font-semibold mb-2">학과 선택</h2>
+          <div id="deptList" class="flex flex-wrap gap-2"></div>
+          <p class="text-xs text-slate-500 mt-2">블록을 선택하면 강조 상태가 유지됩니다.</p>
+        </div>
+        <div>
+          <h2 class="text-base font-semibold mb-2">아이디 선택</h2>
+          <div id="idList" class="flex flex-wrap gap-2 max-h-64 overflow-auto pr-1 scrollbar-thin"></div>
+          <p class="text-xs text-slate-500 mt-2">학과를 먼저 선택하면 아이디가 나열됩니다.</p>
+        </div>
+        <div class="border-t pt-4">
+          <h2 class="text-base font-semibold mb-2">보기 옵션</h2>
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input id="toggleStar" type="checkbox" class="accent-blue-600" checked>
+            <span>펜타그램(별 윤곽) 오버레이</span>
+          </label>
+        </div>
+      </div>
+    </aside>
+
+    <section class="col-span-12 lg:col-span-9">
+      <div class="bg-white rounded-2xl shadow p-4">
+        <h2 class="text-lg font-semibold mb-4">개인 프로파일</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="border rounded-xl p-3">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-semibold">1) 정체성 모음</h3>
+            </div>
+            <div class="h-[480px]"><canvas id="chartIdentity"></canvas></div>
+          </div>
+          <div class="border rounded-xl p-3">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-semibold">2) 동기 모음</h3>
+            </div>
+            <div class="h-[480px]"><canvas id="chartMotivation"></canvas></div>
+          </div>
+          <div class="border rounded-xl p-3">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-semibold">3) Big Five</h3>
+            </div>
+            <div class="h-[480px]"><canvas id="chartBig5"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const DATA = {
+  "공과대학": {
+    "ids": {
+      "데이나": {
+        "identity_general": [
+          4.0,
+          4.0,
+          2.0,
+          3.3333333333333335,
+          3.6666666666666665
+        ],
+        "identity_job": [
+          4.0,
+          4.0,
+          2.0,
+          3.3333333333333335,
+          3.6666666666666665
+        ],
+        "motivation_general": [
+          3.6666666666666665,
+          4.0,
+          2.6666666666666665,
+          3.3333333333333335,
+          2.0
+        ],
+        "big5": [
+          3.3333333333333335,
+          4.0,
+          1.0,
+          3.0,
+          4.0
+        ]
+      }
+    }
+  },
+  "뷰티산업학과": {
+    "ids": {
+      "윙크": {
+        "identity_general": [
+          3.0,
+          3.6666666666666665,
+          3.3333333333333335,
+          2.6666666666666665,
+          4.666666666666667
+        ],
+        "identity_job": [
+          4.0,
+          3.6666666666666665,
+          3.3333333333333335,
+          3.0,
+          4.0
+        ],
+        "motivation_general": [
+          4.666666666666667,
+          4.333333333333333,
+          3.0,
+          3.3333333333333335,
+          1.3333333333333333
+        ],
+        "big5": [
+          2.3333333333333335,
+          3.6666666666666665,
+          3.6666666666666665,
+          2.6666666666666665,
+          3.0
+        ]
+      }
+    }
+  },
+  "의학과": {
+    "ids": {
+      "붕어빵": {
+        "identity_general": [
+          3.6666666666666665,
+          4.0,
+          2.3333333333333335,
+          3.6666666666666665,
+          4.333333333333333
+        ],
+        "identity_job": [
+          5.0,
+          5.0,
+          3.3333333333333335,
+          3.0,
+          4.0
+        ],
+        "motivation_general": [
+          3.6666666666666665,
+          4.666666666666667,
+          3.0,
+          3.0,
+          1.3333333333333333
+        ],
+        "big5": [
+          2.0,
+          4.0,
+          2.6666666666666665,
+          3.0,
+          4.0
+        ]
+      },
+      "폐활량": {
+        "identity_general": [
+          2.0,
+          4.0,
+          2.3333333333333335,
+          3.3333333333333335,
+          3.3333333333333335
+        ],
+        "identity_job": [
+          4.0,
+          3.3333333333333335,
+          2.0,
+          4.0,
+          4.0
+        ],
+        "motivation_general": [
+          4.666666666666667,
+          5.0,
+          3.6666666666666665,
+          1.6666666666666667,
+          1.0
+        ],
+        "big5": [
+          1.6666666666666667,
+          4.0,
+          3.0,
+          3.3333333333333335,
+          3.6666666666666665
+        ]
+      },
+      "해미": {
+        "identity_general": [
+          4.0,
+          4.666666666666667,
+          2.6666666666666665,
+          3.3333333333333335,
+          4.666666666666667
+        ],
+        "identity_job": [
+          4.666666666666667,
+          5.0,
+          2.3333333333333335,
+          3.6666666666666665,
+          4.333333333333333
+        ],
+        "motivation_general": [
+          4.666666666666667,
+          5.0,
+          3.0,
+          2.6666666666666665,
+          1.6666666666666667
+        ],
+        "big5": [
+          4.333333333333333,
+          2.6666666666666665,
+          4.333333333333333,
+          2.6666666666666665,
+          3.6666666666666665
+        ]
+      },
+      "뿌우우": {
+        "identity_general": [
+          4.333333333333333,
+          4.333333333333333,
+          3.3333333333333335,
+          3.6666666666666665,
+          4.666666666666667
+        ],
+        "identity_job": [
+          4.0,
+          4.666666666666667,
+          3.6666666666666665,
+          3.6666666666666665,
+          4.333333333333333
+        ],
+        "motivation_general": [
+          3.6666666666666665,
+          5.0,
+          4.333333333333333,
+          4.0,
+          1.0
+        ],
+        "big5": [
+          1.6666666666666667,
+          4.333333333333333,
+          2.0,
+          2.6666666666666665,
+          3.6666666666666665
+        ]
+      }
+    }
+  },
+  "정보컴퓨터공학부": {
+    "ids": {
+      "abc": {
+        "identity_general": [
+          2.3333333333333335,
+          2.6666666666666665,
+          3.6666666666666665,
+          3.6666666666666665,
+          3.6666666666666665
+        ],
+        "identity_job": [
+          3.3333333333333335,
+          3.3333333333333335,
+          3.6666666666666665,
+          3.6666666666666665,
+          4.0
+        ],
+        "motivation_general": [
+          4.0,
+          3.6666666666666665,
+          3.3333333333333335,
+          3.3333333333333335,
+          3.3333333333333335
+        ],
+        "big5": [
+          2.6666666666666665,
+          2.0,
+          4.0,
+          2.6666666666666665,
+          3.0
+        ]
+      }
+    }
+  },
+  "지질학": {
+    "ids": {
+      "하루짱": {
+        "identity_general": [
+          4.333333333333333,
+          5.0,
+          2.3333333333333335,
+          4.0,
+          4.333333333333333
+        ],
+        "identity_job": [
+          4.666666666666667,
+          4.333333333333333,
+          2.3333333333333335,
+          4.0,
+          4.0
+        ],
+        "motivation_general": [
+          5.0,
+          4.333333333333333,
+          2.0,
+          2.3333333333333335,
+          1.3333333333333333
+        ],
+        "big5": [
+          5.0,
+          4.333333333333333,
+          3.0,
+          3.0,
+          3.0
+        ]
+      }
+    }
+  },
+  "환경공학과": {
+    "ids": {
+      "몽키": {
+        "identity_general": [
+          3.6666666666666665,
+          3.6666666666666665,
+          3.3333333333333335,
+          4.0,
+          4.0
+        ],
+        "identity_job": [
+          3.6666666666666665,
+          3.6666666666666665,
+          4.0,
+          3.6666666666666665,
+          4.0
+        ],
+        "motivation_general": [
+          4.333333333333333,
+          4.0,
+          3.0,
+          4.333333333333333,
+          3.0
+        ],
+        "big5": [
+          4.666666666666667,
+          2.0,
+          2.0,
+          4.333333333333333,
+          5.0
+        ]
+      }
+    }
+  }
+};
+
+    const AXES = {
+      identity: ['전념확신','넓게탐색','반추적탐색','전념동일시','깊게탐색'],
+      motivation: ['내재적','동일시조절','내사조절','외적조절','무동기'],
+      big5: ['개방성','성실성','신경성','외향성','친화성']
+    };
+
+    const PentagramOverlay = {
+      id: 'pentagramOverlay',
+      afterDatasetsDraw(chart) {
+        const showStar = document.getElementById('toggleStar').checked;
+        if (!showStar) return;
+        const meta = chart.getDatasetMeta(0);
+        if (!meta || !meta.data || meta.data.length !== 5) return;
+        const ctx = chart.ctx;
+        const pts = meta.data.map(el => ({ x: el.x, y: el.y }));
+        const order = [0,2,4,1,3,0];
+        ctx.save(); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(30,41,59,0.6)';
+        ctx.beginPath(); ctx.moveTo(pts[order[0]].x, pts[order[0]].y);
+        for (let i=1;i<order.length;i++) { const p = pts[order[i]]; ctx.lineTo(p.x,p.y); }
+        ctx.stroke(); ctx.restore();
+      }
+    };
+    Chart.register(PentagramOverlay);
+
+    const pointLabelDescriptions = {
+        identity: {
+            '전념확신': '미래에 무엇을 할 지에 대한 계획과 진로 방향을 세운 정도',
+            '넓게탐색': '다양한 삶의 가능성과 방향을 폭넓게 살펴보는 정도',
+            '반추적탐색': '삶의 방향에 대해 걱정과 막연한 고민에 머무르는 정도',
+            '전념동일시': '세운 미래 계획이 자신과 잘 맞고 확신을 주는 정도',
+            '깊게탐색': '세운 삶의 목표나 계획이 자신에게 적합한지 깊이 검토하는 정도'
+        },
+        motivation: {
+            '내재적': '학업 자체에서 즐거움·호기심·몰입을 느끼는 정도',
+            '동일시조절': '학업이 자신의 진로와 목표 실현에 필요하다고 인식하는 정도',
+            '내사조절': '수치심·평가 불안·뒤처짐 회피 같은 내적 압박 때문에 학습하는 정도',
+            '외적조절': '장학금·학점·졸업 요건 등 외부 요구 충족을 위해 학습하는 정도',
+            '무동기': '학업의 의미를 찾지 못하고 무관심하거나 동기가 부족한 상태'
+        },
+        big5: {
+            '개방성': '창의적이고 상상력이 풍부하며 새로운 경험과 아이디어를 즐기는 성향',
+            '성실성': '책임감 있고 계획적이며 신뢰할 수 있게 목표를 수행하는 성향',
+            '신경성': '정서적으로 불안정하고 걱정이나 부정적 감정을 쉽게 경험하는 성향',
+            '외향성': '활발하고 사교적이며 타인과의 교류에서 에너지를 얻는 성향',
+            '친화성': '따뜻하고 친절하며 타인을 돕고 협력적이고 이타적인 성향'
+        }
+    };
+
+    const ctxIdentity = document.getElementById('chartIdentity').getContext('2d');
+    const ctxMotivation = document.getElementById('chartMotivation').getContext('2d');
+    const ctxBig5 = document.getElementById('chartBig5').getContext('2d');
+    let chartIdentity, chartMotivation, chartBig5;
+
+    // ✅ [수정] radarOptions 함수가 차트의 '키'를 인자로 받도록 변경합니다.
+    function radarOptions(chartKey) {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, position: 'bottom' },
+                tooltip: { 
+                    enabled: true,
+                    callbacks: {
+                        afterTitle: function(context) {
+                            const label = context[0].label;
+                            // chartKey를 이용해 해당 차트에 맞는 설명 데이터를 찾습니다.
+                            const description = pointLabelDescriptions[chartKey]?.[label];
+                            return description ? '\n' + description : '';
+                        }
+                    }
+                }
+            },
+            scales: {
+                r: {
+                    min: 1, max: 5,
+                    ticks: { stepSize: 1, backdropColor: 'transparent' },
+                    grid: { circular: false },
+                    angleLines: { color: 'rgba(148,163,184,0.35)' },
+                    pointLabels: { color: '#0f172a', font: { size: 13 } }
+                }
+            },
+            elements: { line: { borderWidth: 2 }, point: { radius: 3 } }
+        };
+    }
+
+    // ...
+
+    function createCharts() {
+        const base = [1,1,1,1,1];
+        chartIdentity = new Chart(ctxIdentity, {
+            type: 'radar',
+            data: {
+                labels: AXES.identity,
+                datasets: [
+                    { label: '일반 정체성', data: base, fill: true, backgroundColor: 'rgba(59,130,246,0.12)', borderColor: 'rgba(37,99,235,1)' },
+                    { label: '직업 정체성', data: base, fill: true, backgroundColor: 'rgba(147,197,253,0.12)', borderColor: 'rgba(2,132,199,1)' }
+                ]
+            },
+            // ✅ [수정] radarOptions를 호출할 때 차트 키('identity')를 전달합니다.
+            options: radarOptions('identity'),
+        });
+
+        chartMotivation = new Chart(ctxMotivation, {
+            type: 'radar',
+            data: {
+                labels: AXES.motivation,
+                datasets: [
+                    { label: '일반 동기', data: base, fill: true, backgroundColor: 'rgba(16,185,129,0.12)', borderColor: 'rgba(5,150,105,1)' }
+                ]
+            },
+            // ✅ [수정] radarOptions를 호출할 때 차트 키('motivation')를 전달합니다.
+            options: radarOptions('motivation')
+        });
+
+        chartBig5 = new Chart(ctxBig5, {
+            type: 'radar',
+            data: {
+                labels: AXES.big5,
+                datasets: [
+                    { label: 'Big5', data: base, fill: true, backgroundColor: 'rgba(234,179,8,0.12)', borderColor: 'rgba(202,138,4,1)' }
+                ]
+            },
+            // ✅ [수정] radarOptions를 호출할 때 차트 키('big5')를 전달합니다.
+            options: radarOptions('big5')
+        });
+    }
+
+    function updateCharts(sample) {
+      chartIdentity.data.datasets[0].data = sample.identity_general;
+      chartIdentity.data.datasets[1].data = sample.identity_job;
+      chartIdentity.update();
+
+      chartMotivation.data.datasets[0].data = sample.motivation_general;
+      chartMotivation.update();
+
+      chartBig5.data.datasets[0].data = sample.big5;
+      chartBig5.update();
+    }
+
+    const deptList = document.getElementById('deptList');
+    const idList = document.getElementById('idList');
+    let currentDept = null; let currentId = null;
+
+    function highlightActive(container, activeBtn) {
+      Array.from(container.children).forEach(el => el.classList.remove('is-active'));
+      if (activeBtn) activeBtn.classList.add('is-active');
+    }
+
+    function renderDeptButtons() {
+      deptList.innerHTML='';
+      Object.keys(DATA).forEach(dept => {
+        const btn = document.createElement('button');
+        btn.textContent = dept;
+        btn.className = 'px-3 py-1.5 rounded-full border text-sm hover:bg-slate-100';
+        btn.addEventListener('click', ()=>{
+          currentDept = dept; currentId = null;
+          highlightActive(deptList, btn);
+          renderIdButtons(dept);
+          const firstId = Object.keys(DATA[dept].ids)[0];
+          if (firstId) selectId(firstId, idList.querySelector('button'));
+        });
+        deptList.appendChild(btn);
+      });
+    }
+
+    function renderIdButtons(dept) {
+      idList.innerHTML = '';
+      const ids = Object.keys(DATA[dept]?.ids || {});
+      ids.forEach((id, idx)=>{
+        const btn = document.createElement('button');
+        btn.textContent = id;
+        btn.className = 'px-3 py-1.5 rounded-full border text-sm hover:bg-slate-100';
+        btn.addEventListener('click', ()=> selectId(id, btn));
+        idList.appendChild(btn);
+        if (idx===0) highlightActive(idList, btn);
+      });
+    }
+
+    function selectId(id, btnEl) {
+      currentId = id;
+      if (btnEl) highlightActive(idList, btnEl);
+      const sample = DATA[currentDept]?.ids?.[currentId];
+      if (sample) updateCharts(sample);
+    }
+
+    document.getElementById('toggleStar').addEventListener('change', ()=>{
+      chartIdentity.update(); chartMotivation.update(); chartBig5.update();
+    });
+
+    // Boot
+    createCharts();
+    renderDeptButtons();
+    const firstDept = Object.keys(DATA)[0];
+    if (firstDept) {
+      const firstDeptBtn = deptList.querySelector('button');
+      if (firstDeptBtn) firstDeptBtn.click();
+    }
+  </script>
+</body>
+</html>
